@@ -1,7 +1,6 @@
 import logging
 import time
-from typing import Optional
-
+from typing import Dict, Optional, Type, Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +8,7 @@ logger = logging.getLogger(__name__)
 class ComputeTimer:
     """ Keeps track of computation / idle time per Golem session """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._time_comp: float = 0.
         self._time_idle: float = 0.
 
@@ -65,4 +64,29 @@ class ComputeTimer:
         self._time_finished = now
 
 
+class TypedDict(dict):
+
+    CLS: ClassVar
+
+    def __missing__(self, key):
+        value = self[key] = self.CLS()
+        return value
+
+    def __setitem__(self, key, value):
+        if not isinstance(value, self.CLS):
+            raise ValueError(f"Invalid value type: {type(value)}")
+        return dict.__setitem__(self, key, value)
+
+
+class ComputeTimerRepository(TypedDict):
+    # pylint: disable=too-few-public-methods
+    CLS = ComputeTimer
+
+
+class TaskComputeTimer(TypedDict):
+    # pylint: disable=too-few-public-methods
+    CLS = ComputeTimerRepository
+
+
 ProviderComputeTimer = ComputeTimer()  # noqa
+RequestorComputeTimers = TaskComputeTimer()  # noqa

@@ -30,6 +30,7 @@ from golem.task.taskkeeper import CompTaskKeeper
 from golem.task.taskrequestorstats import RequestorTaskStatsManager
 from golem.task.taskstate import TaskState, TaskStatus, SubtaskStatus, \
     SubtaskState, Operation, TaskOp, SubtaskOp, OtherOp
+from golem.task.timer import RequestorComputeTimers
 
 logger = logging.getLogger(__name__)
 
@@ -1158,6 +1159,35 @@ class TaskManager(TaskEventListener):
             op=op,
         )
 
+        self._check_timers(task_id, subtask_id, op)
+
         if self.finished_cb and persist and op \
                 and op.task_related() and op.is_completed():
             self.finished_cb()
+
+    def _check_timers(self, task_id: str,
+                      subtask_id: Optional[str] = None,
+                      op: Operation = None):
+
+        if subtask_id and isinstance(op, SubtaskOp) and op not in (
+            SubtaskOp.ASSIGNED,
+            SubtaskOp.RESULT_DOWNLOADING,
+            SubtaskOp.NOT_ACCEPTED
+        ):
+            self._stop_timer(task_id, subtask_id)
+
+        elif isinstance(op, TaskOp) and op in (
+            TaskOp.ABORTED,
+            TaskOp.TIMEOUT,
+            TaskOp.RESTARTED
+        ):
+            for _subtask_id in self.tasks_states[task_id].subtask_states:
+                self._stop_timer(task_id, _subtask_id)
+
+    def _stop_timer(self, task_id: str, subtask_id: str) -> None:
+
+        task_state = self.tasks_states[task_id]
+        subtask = task_state.subtask_states[subtask_id]
+        node_id = subtask.computer.node_id
+
+        RequestorComputeTimers[subtask_id][node_id].stop()

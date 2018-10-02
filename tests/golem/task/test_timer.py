@@ -1,9 +1,10 @@
 import unittest
+import uuid
 from datetime import timedelta
 
 from freezegun import freeze_time
 
-from golem.task.timer import ComputeTimer
+from golem.task.timer import ComputeTimer, TaskComputeTimer
 
 
 class TestComputeTimer(unittest.TestCase):
@@ -85,3 +86,24 @@ class TestComputeTimer(unittest.TestCase):
         frozen_time.tick(timedelta(seconds=5))
         timer.start()
         assert timer.time_idle() == 10.
+
+
+class TestTaskComputeTimer(unittest.TestCase):
+
+    # pylint: disable=no-member,no-self-argument
+
+    @freeze_time("2018-01-01 00:00:00", as_arg=True)
+    def test(frozen_time, _):
+        task_id = str(uuid.uuid4())
+        provider_id = str(uuid.uuid4())
+
+        repository = TaskComputeTimer()
+
+        assert isinstance(repository[task_id][provider_id], ComputeTimer)
+
+        repository[task_id][provider_id].start()
+        frozen_time.tick(timedelta(seconds=5))
+        repository[task_id][provider_id].stop()
+
+        assert repository[task_id][provider_id].time_computing() == 5
+
